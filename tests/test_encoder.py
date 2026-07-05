@@ -40,3 +40,12 @@ def test_encoder_produces_mp3():
     enc.close()
     assert len(data) >= 8000
     assert b"\xff" in data[:4000]           # mp3 frame sync bytes present
+
+
+def test_new_listener_gets_preroll():
+    b = Broadcast()
+    for k in range(40):
+        b.publish(bytes([k]))
+    _, q = b.add()
+    assert q.qsize() > 0                    # instant start from preroll
+    assert q.qsize() <= b.preroll_max       # and bounded

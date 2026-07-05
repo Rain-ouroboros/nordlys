@@ -1,20 +1,27 @@
 import queue
 import subprocess
 import threading
+from collections import deque
 
 import numpy as np
 
 
 class Broadcast:
+    # ~8 s of 128 kbps mp3 in 4 KB chunks: instant playback for new listeners
+    preroll_max = 32
+
     def __init__(self, maxsize: int = 256):
         self.maxsize = maxsize
         self.listeners: dict[int, queue.Queue] = {}
+        self.preroll: deque[bytes] = deque(maxlen=self.preroll_max)
         self.lock = threading.Lock()
         self._next = 0
 
     def add(self):
         q = queue.Queue(maxsize=self.maxsize)
         with self.lock:
+            for chunk in self.preroll:
+                q.put_nowait(chunk)
             i = self._next
             self._next += 1
             self.listeners[i] = q
@@ -26,6 +33,7 @@ class Broadcast:
 
     def publish(self, chunk: bytes):
         with self.lock:
+            self.preroll.append(chunk)
             qs = list(self.listeners.values())
         for q in qs:
             try:
