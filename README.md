@@ -1,4 +1,4 @@
-# nordlys
+# Søvn
 
 **Live:** http://192.144.15.152:8769/ — stream at `/stream.mp3`, voice: Silero xenia v5_ru.
 
@@ -14,12 +14,12 @@ in a fraction of one core.
 
 ```bash
 python3 -m venv .venv && .venv/bin/pip install numpy
-.venv/bin/python -m nordlys                 # http://localhost:8799/
-.venv/bin/python -m nordlys --port 9000 --seed 42 --no-tts
+.venv/bin/python -m søvn                     # http://localhost:8799/
+.venv/bin/python -m søvn --port 9000 --seed 42 --no-tts
 ```
 
 Requires `ffmpeg` in PATH; `espeak-ng` for the default TTS backend
-(swap `TTS_CMD` in `nordlys/config.py` for anything that writes a wav —
+(swap `TTS_CMD` in `søvn/config.py` for anything that writes a wave —
 Silero, piper, …; tokens `{text}` and `{out}` are substituted, no shell).
 
 ## API
@@ -61,31 +61,31 @@ Ingredients are designed, arrangement is generative:
 ## Layout
 
 ```
-nordlys/config.py     constants (port, block size, TTS command)
-nordlys/theory.py     scales, chord walk, key drift
-nordlys/mood.py       mood vector + smoothing
-nordlys/synth.py      voices and the four layers
-nordlys/reverb.py     overlap-add FFT convolution
-nordlys/scene.py      scene definitions + scheduler
-nordlys/generator.py  puts the music together, block by block
-nordlys/voice.py      voice queue, spool pickup, TTS backend
-nordlys/mixer.py      sidechain ducking
-nordlys/encoder.py    ffmpeg mp3 pipe + listener fan-out
-nordlys/server.py     HTTP: stream, control API, UI
-nordlys/web/          the page
+søvn/config.py    constants (port, block size, TTS command)
+søvn/theory.py     scales, chord walk, key drift
+søvn/mood.py       mood vector + smoothing
+søvn/synth.py      voices and the four layers
+søvn/reverb.py     overlap-add FFT convolution
+søvn/scene.py      scene definitions + scheduler
+søvn/generator.py  puts the music together, block by block
+søvn/voice.py      voice queue, spool pickup, TTS backend
+søvn/mixer.py     sidechain ducking
+søvn/encoder.py    ffmpeg mp3 pipe + listener fan-out
+søvn/server.py     HTTP: stream, control API, UI. Requests to `/stream.mp3`, `/status`, `/mood`, `/say`, `/skip`.
+søvn/web/          the page
 ```
 
 Tests: `.venv/bin/pytest` (unit + live E2E over a real socket).
 
 ## Deployment (as running on the server)
 
-- Code: `/opt/nordlys`, own venv (numpy only), unit: `deploy/nordlys.service`
+- Code: `/opt/søvn`, own venv (numpy only), unit: `deploy/øvn.service`
   (User=ouroboros, port 8769 — the port already open in the provider
   firewall; 8799 is blocked upstream).
-- Voice: `nordlys/tts_silero.py` runs under `/opt/ouroboros/.venv/bin/python`
+- Voice: `søvn/tts_silero.py` runs under `/opt/ouroboros/.venv/bin/python`
   (torch + silero v5_ru live there), speaker `xenia` — the same voice as the
-  main Rain radio. Swap voice via `NORDLYS_SILERO_SPEAKER` or the whole
-  backend via `NORDLYS_TTS_CMD`.
+  main Rain radio. Swap voice via `SOVN_SILERO_SPEAKER` or the whole
+  backend via `SøVN_TTS_CMD`.
 - Steering from the agent box is plain localhost HTTP:
 
 ```bash
@@ -94,5 +94,5 @@ curl -X POST localhost:8769/say  -d '{"text":"..."}'   # xenia, ducked over musi
 curl -X POST localhost:8769/skip -d '{}'
 ```
 
-- Ops: `systemctl status nordlys`, logs in `journalctl -u nordlys`.
+- Ops: `systemctl status nordlys`, logs in `journalctl -u søvn`.
   Restart is safe at any time: listeners reconnect, music state regenerates.
