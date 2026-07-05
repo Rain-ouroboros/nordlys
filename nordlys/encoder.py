@@ -57,8 +57,11 @@ class Mp3Encoder:
     def _start(self):
         self.proc = subprocess.Popen(
             ["ffmpeg", "-hide_banner", "-loglevel", "error",
+             # tiny probe: emit mp3 from the first block instead of
+             # buffering ~4.5 s of input before any output appears
+             "-probesize", "32", "-analyzeduration", "0",
              "-f", "s16le", "-ar", str(self.sr), "-ac", "2", "-i", "pipe:0",
-             "-f", "mp3", "-b:a", self.bitrate, "pipe:1"],
+             "-f", "mp3", "-b:a", self.bitrate, "-flush_packets", "1", "pipe:1"],
             stdin=subprocess.PIPE, stdout=subprocess.PIPE)
         self.reader = threading.Thread(target=self._read, args=(self.proc,), daemon=True)
         self.reader.start()
@@ -74,10 +77,12 @@ class Mp3Encoder:
         pcm = (np.clip(block.T, -1.0, 1.0) * 32767.0).astype("<i2").tobytes()
         try:
             self.proc.stdin.write(pcm)
+            self.proc.stdin.flush()
         except (BrokenPipeError, OSError):
             if not self.closing:
                 self._start()
                 self.proc.stdin.write(pcm)
+                self.proc.stdin.flush()
 
     def close(self):
         self.closing = True
