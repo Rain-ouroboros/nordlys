@@ -83,10 +83,9 @@ def test_index_is_nordlys_ui(station):
 def test_query_string_stripped(station):
     st, port = station
     # UI requests /stream.mp3?<cache-buster>; must not 404
-    req = urllib.request.Request(f"http://127.0.0.1:{port}/stream.mp3?123")
-    with urllib.request.urlopen(req, timeout=5) as r:
-        assert r.status == 200
-        assert r.headers["Content-Type"] == "audio/mpeg"
-        r.fp.close()
+    r = urllib.request.urlopen(f"http://127.0.0.1:{port}/stream.mp3?123", timeout=5)
+    assert r.status == 200
+    assert r.headers["Content-Type"] == "audio/mpeg"
+    r.close()
     code, _ = _get(port, "/status?x=1")
     assert code == 200
