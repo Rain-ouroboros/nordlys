@@ -1,5 +1,7 @@
 # nordlys
 
+**Live:** http://192.144.15.152:8769/ — stream at `/stream.mp3`, voice: Silero xenia v5_ru.
+
 Agent-steered generative ambient radio. One Python process: procedural
 ambient music (Carbon Based Lifeforms / Meg Bowles territory), an HTTP mp3
 stream, and a voice bus that lets an agent talk over the music like a live
@@ -74,3 +76,23 @@ nordlys/web/          the page
 ```
 
 Tests: `.venv/bin/pytest` (unit + live E2E over a real socket).
+
+## Deployment (as running on the server)
+
+- Code: `/opt/nordlys`, own venv (numpy only), unit: `deploy/nordlys.service`
+  (User=ouroboros, port 8769 — the port already open in the provider
+  firewall; 8799 is blocked upstream).
+- Voice: `nordlys/tts_silero.py` runs under `/opt/ouroboros/.venv/bin/python`
+  (torch + silero v5_ru live there), speaker `xenia` — the same voice as the
+  main Rain radio. Swap voice via `NORDLYS_SILERO_SPEAKER` or the whole
+  backend via `NORDLYS_TTS_CMD`.
+- Steering from the agent box is plain localhost HTTP:
+
+```bash
+curl -X POST localhost:8769/mood -d '{"warmth":0.8,"density":0.3}'
+curl -X POST localhost:8769/say  -d '{"text":"..."}'   # xenia, ducked over music
+curl -X POST localhost:8769/skip -d '{}'
+```
+
+- Ops: `systemctl status nordlys`, logs in `journalctl -u nordlys`.
+  Restart is safe at any time: listeners reconnect, music state regenerates.

@@ -1,0 +1,21 @@
+[Unit]
+Description=nordlys — agent-steered generative ambient radio
+After=network.target
+
+[Service]
+Type=simple
+User=ouroboros
+Group=ouroboros
+WorkingDirectory=/opt/nordlys
+ExecStart=/opt/nordlys/.venv/bin/python -m nordlys --port 8769
+Environment="NORDLYS_TTS_CMD=/opt/ouroboros/.venv/bin/python -m nordlys.tts_silero {out} {text}"
+Environment=NORDLYS_SILERO_MODEL_PATH=/opt/ouroboros/.venv/lib/python3.12/site-packages/silero/model/v5_ru.pt
+Environment=NORDLYS_SILERO_SPEAKER=xenia
+Environment=OMP_NUM_THREADS=2
+Restart=always
+RestartSec=5
+MemoryMax=2G
+Nice=5
+
+[Install]
+WantedBy=multi-user.target
