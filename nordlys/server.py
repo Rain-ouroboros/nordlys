@@ -65,10 +65,15 @@ class Handler(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(body)
 
+    @property
+    def route(self) -> str:
+        # UI adds cache-buster query strings; match on the bare path
+        return self.path.split("?", 1)[0]
+
     def do_GET(self):
-        if self.path == "/status":
+        if self.route == "/status":
             self._json(self.station.status())
-        elif self.path in ("/", "/index.html"):
+        elif self.route in ("/", "/index.html"):
             try:
                 with open(os.path.join(WEB_DIR, "index.html"), "rb") as f:
                     body = f.read()
@@ -79,7 +84,7 @@ class Handler(BaseHTTPRequestHandler):
             self.send_header("Content-Length", str(len(body)))
             self.end_headers()
             self.wfile.write(body)
-        elif self.path == "/stream.mp3":
+        elif self.route == "/stream.mp3":
             self._stream()
         else:
             self._json({"error": "not found"}, 404)
@@ -105,12 +110,12 @@ class Handler(BaseHTTPRequestHandler):
             data = json.loads(self.rfile.read(n) or b"{}")
         except json.JSONDecodeError:
             return self._json({"error": "bad json"}, 400)
-        if self.path == "/mood":
+        if self.route == "/mood":
             self.station.gen.set_mood(**{k: v for k, v in data.items()
                                          if isinstance(v, (int, float))})
             self._json({"ok": True,
                         "target": self.station.gen.status()["mood"]["target"]})
-        elif self.path == "/say":
+        elif self.route == "/say":
             text = str(data.get("text", "")).strip()
             if not text:
                 return self._json({"error": "empty text"}, 400)
@@ -119,7 +124,7 @@ class Handler(BaseHTTPRequestHandler):
             threading.Thread(target=self.station.voice.say, args=(text,),
                              daemon=True).start()
             self._json({"ok": True, "queued": self.station.voice.queued + 1})
-        elif self.path == "/skip":
+        elif self.route == "/skip":
             self.station.gen.skip()
             self._json({"ok": True})
         else:
