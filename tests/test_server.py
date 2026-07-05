@@ -71,3 +71,10 @@ def test_404(station):
     st, port = station
     with pytest.raises(urllib.error.HTTPError):
         _get(port, "/nope")
+
+
+def test_index_is_nordlys_ui(station):
+    st, port = station
+    _, body = _get(port, "/")
+    html = body.decode()
+    assert "canvas" in html and "#2e3440" in html.lower()

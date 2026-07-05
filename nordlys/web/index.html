@@ -1,0 +1,149 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>nordlys</title>
+<style>
+  :root {
+    --bg: #2e3440; --panel: #3b4252; --line: #434c5e;
+    --txt: #d8dee9; --bright: #eceff4; --dim: #7b88a1;
+    --frost: #88c0d0; --frost2: #81a1b1; --blue: #5e81ac;
+    --purple: #b48ead; --green: #a3be8c; --yellow: #ebcb8b; --red: #bf616a;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { height: 100%; }
+  body {
+    background: var(--bg); color: var(--txt);
+    font: 15px/1.5 "Iosevka", "JetBrains Mono", ui-monospace, monospace;
+    display: flex; align-items: center; justify-content: center;
+    overflow: hidden;
+  }
+  canvas#aurora { position: fixed; inset: 0; width: 100vw; height: 100vh; }
+  main {
+    position: relative; z-index: 1; text-align: center;
+    padding: 2.2rem 2.8rem; border-radius: 14px;
+    background: color-mix(in srgb, var(--bg) 72%, transparent);
+    backdrop-filter: blur(10px);
+    border: 1px solid color-mix(in srgb, var(--line) 60%, transparent);
+    min-width: 320px;
+  }
+  h1 { color: var(--bright); font-size: 1.5rem; font-weight: 500; letter-spacing: .45em;
+       margin-bottom: .2rem; padding-left: .45em; }
+  .sub { color: var(--dim); font-size: .78rem; margin-bottom: 1.4rem; }
+  .onair { display: inline-block; width: 9px; height: 9px; border-radius: 50%;
+           background: var(--green); margin-right: .5em; vertical-align: 1px;
+           animation: pulse 3s ease-in-out infinite; }
+  .onair.off { background: var(--red); animation: none; }
+  @keyframes pulse { 50% { opacity: .35; } }
+  #scene { color: var(--frost); font-size: .95rem; margin-bottom: 1.2rem; min-height: 1.5em; }
+  #scene .key { color: var(--dim); }
+  .moods { display: grid; grid-template-columns: auto 1fr; gap: .35rem .8rem;
+           text-align: left; font-size: .78rem; color: var(--dim); margin-bottom: 1.5rem; }
+  .bar { align-self: center; height: 4px; border-radius: 2px; background: var(--line);
+         overflow: hidden; }
+  .bar i { display: block; height: 100%; width: 0; border-radius: 2px;
+           background: var(--frost); transition: width 2.5s ease; }
+  .bar.warmth i { background: var(--yellow); }
+  .bar.density i { background: var(--purple); }
+  .bar.brightness i { background: var(--green); }
+  button {
+    width: 76px; height: 76px; border-radius: 50%; border: 1px solid var(--line);
+    background: var(--panel); color: var(--frost); font-size: 1.7rem; cursor: pointer;
+    transition: transform .2s, border-color .2s; line-height: 0;
+  }
+  button:hover { transform: scale(1.06); border-color: var(--frost); }
+  .foot { margin-top: 1.3rem; font-size: .75rem; color: var(--dim); min-height: 1.4em; }
+  #voice { display: none; color: var(--yellow); }
+  #voice.on { display: inline; animation: pulse 1.2s infinite; }
+</style>
+</head>
+<body>
+<canvas id="aurora"></canvas>
+<main>
+  <h1>NORDLYS</h1>
+  <div class="sub"><span class="onair off" id="dot"></span><span id="onair">эфир…</span></div>
+  <div id="scene">—</div>
+  <div class="moods">
+    <span>энергия</span><span class="bar energy"><i></i></span>
+    <span>тепло</span><span class="bar warmth"><i></i></span>
+    <span>плотность</span><span class="bar density"><i></i></span>
+    <span>яркость</span><span class="bar brightness"><i></i></span>
+  </div>
+  <button id="play" title="слушать">▶</button>
+  <div class="foot">
+    <span id="listeners"></span>
+    <span id="voice">● голос в эфире</span>
+  </div>
+</main>
+<script>
+const $ = id => document.getElementById(id);
+let audio = null;
+const mood = { energy: .4, warmth: .6, density: .4, brightness: .4 }; // displayed (lerped)
+const live = { ...mood };                                             // last /status
+
+$('play').onclick = () => {
+  if (audio) { audio.pause(); audio.src = ''; audio = null; $('play').textContent = '▶'; return; }
+  audio = new Audio('/stream.mp3?' + Date.now());
+  audio.play();
+  $('play').textContent = '⏸';
+};
+
+async function poll() {
+  try {
+    const r = await fetch('/status'); const s = await r.json();
+    Object.assign(live, s.mood.current);
+    $('dot').className = 'onair' + (s.on_air ? '' : ' off');
+    $('onair').textContent = s.on_air ? 'в эфире' : 'офлайн';
+    $('scene').innerHTML = s.scene + ' <span class="key">· ' + s.key + '</span>';
+    $('listeners').textContent = 'слушателей: ' + s.listeners + ' ';
+    $('voice').className = s.speaking ? 'on' : '';
+    for (const k in mood) {
+      const el = document.querySelector('.bar.' + k + ' i');
+      if (el) el.style.width = (live[k] * 100).toFixed(0) + '%';
+    }
+  } catch (e) { $('onair').textContent = 'нет связи'; $('dot').className = 'onair off'; }
+}
+poll(); setInterval(poll, 5000);
+
+/* aurora: drifting translucent blobs, colors and motion follow the mood */
+const cv = $('aurora'), cx = cv.getContext('2d');
+function resize() { cv.width = innerWidth; cv.height = innerHeight; }
+resize(); addEventListener('resize', resize);
+
+const FROST = [136, 192, 208], BLUE = [94, 129, 172],
+      PURPLE = [180, 142, 173], GREEN = [163, 190, 140], YELLOW = [235, 203, 139];
+const blobs = Array.from({ length: 5 }, (_, i) => ({
+  seed: i * 1.7 + 0.9, spin: 0.13 + 0.11 * i,
+}));
+function mix(a, b, x) { return a.map((v, i) => v + (b[i] - v) * x); }
+let t = 0, last = performance.now();
+
+function draw(now) {
+  const dt = (now - last) / 1000; last = now;
+  for (const k in mood) mood[k] += (live[k] - mood[k]) * Math.min(1, dt * 0.5);
+  t += dt * (0.02 + 0.10 * mood.energy);
+  cx.clearRect(0, 0, cv.width, cv.height);
+  cx.globalCompositeOperation = 'lighter';
+  const count = 2 + Math.round(mood.density * 3);
+  for (let i = 0; i < count; i++) {
+    const b = blobs[i];
+    const x = cv.width  * (0.5 + 0.42 * Math.sin(t * b.spin + b.seed * 2.1));
+    const y = cv.height * (0.42 + 0.34 * Math.cos(t * b.spin * 0.83 + b.seed * 3.7));
+    const rad = Math.min(cv.width, cv.height) * (0.28 + 0.14 * Math.sin(t * 0.7 + b.seed));
+    const cold = mix(FROST, BLUE, (i % 3) / 2);
+    const warm = mix(i % 2 ? PURPLE : YELLOW, GREEN, (i % 3) / 2);
+    const c = mix(cold, warm, mood.warmth);
+    const alpha = 0.05 + 0.13 * mood.brightness;
+    const g = cx.createRadialGradient(x, y, 0, x, y, rad);
+    g.addColorStop(0, `rgba(${c[0] | 0},${c[1] | 0},${c[2] | 0},${alpha})`);
+    g.addColorStop(1, 'rgba(0,0,0,0)');
+    cx.fillStyle = g;
+    cx.fillRect(x - rad, y - rad, rad * 2, rad * 2);
+  }
+  requestAnimationFrame(draw);
+}
+requestAnimationFrame(draw);
+</script>
+</body>
+</html>
