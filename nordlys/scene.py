@@ -62,10 +62,12 @@ class SceneScheduler:
         return min(1.0, self.fade_t / self.fade)
 
     def gains(self) -> dict:
+        # Linear blend: scenes share the same layer instances, so this
+        # interpolates a gain on one signal (equal-power would overshoot).
         x = self._mix()
-        a, b = math.cos(x * math.pi / 2), math.sin(x * math.pi / 2)
         nxt = self.next or self.current
-        return {f: getattr(self.current, f) * a + getattr(nxt, f) * b for f in _GAIN_FIELDS}
+        return {f: getattr(self.current, f) * (1 - x) + getattr(nxt, f) * x
+                for f in _GAIN_FIELDS}
 
     def mood_bias(self) -> dict:
         x = self._mix()
