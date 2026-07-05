@@ -28,16 +28,26 @@ class Station:
 
     def run_pipeline(self):
         self.on_air = True
-        lead, produced, t0 = LEAD_SEC, 0.0, time.monotonic()
+        # Music is generated in big blocks, but fed to the encoder in ~1 s
+        # slices on a wall-clock pace: listeners get a steady mp3 trickle
+        # instead of an 8 s burst-then-silence pattern that starves the
+        # browser's playback buffer.
+        chunk = self.sr
+        produced, t0 = 0.0, time.monotonic()
         while not self.stop.is_set():
             self.voice.poll_spool()
             music = self.gen.next_block()
             voice = self.voice.pull(self.block)
-            self.encoder.feed(self.ducker.process(music, voice))
-            produced += self.block / self.sr
-            ahead = produced - (time.monotonic() - t0)
-            if ahead > lead:
-                time.sleep(ahead - lead)
+            out = self.ducker.process(music, voice)
+            for i in range(0, out.shape[1], chunk):
+                if self.stop.is_set():
+                    break
+                piece = out[:, i:i + chunk]
+                self.encoder.feed(piece)
+                produced += piece.shape[1] / self.sr
+                ahead = produced - (time.monotonic() - t0)
+                if ahead > LEAD_SEC:
+                    time.sleep(ahead - LEAD_SEC)
         self.on_air = False
 
     def status(self) -> dict:

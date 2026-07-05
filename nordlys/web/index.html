@@ -82,12 +82,30 @@ let audio = null;
 const mood = { energy: .4, warmth: .6, density: .4, brightness: .4 }; // displayed (lerped)
 const live = { ...mood };                                             // last /status
 
-$('play').onclick = () => {
-  if (audio) { audio.pause(); audio.src = ''; audio = null; $('play').textContent = '▶'; return; }
+let stallTimer = null;
+
+function startStream() {
   audio = new Audio('/stream.mp3?' + Date.now());
+  // live stream can stall on network hiccups and never resume by itself:
+  // if no progress for 5 s while we are supposed to be playing — reconnect
+  const rearm = () => {
+    clearTimeout(stallTimer);
+    stallTimer = setTimeout(() => { if (audio) { stopStream(); startStream(); } }, 5000);
+  };
+  audio.addEventListener('timeupdate', rearm);
+  audio.addEventListener('error', () => { if (audio) { stopStream(); startStream(); } });
+  rearm();
   audio.play();
   $('play').textContent = '⏸';
-};
+}
+
+function stopStream() {
+  clearTimeout(stallTimer);
+  if (audio) { audio.pause(); audio.src = ''; audio = null; }
+  $('play').textContent = '▶';
+}
+
+$('play').onclick = () => { audio ? stopStream() : startStream(); };
 
 async function poll() {
   try {

@@ -89,3 +89,27 @@ def test_query_string_stripped(station):
     r.close()
     code, _ = _get(port, "/status?x=1")
     assert code == 200
+
+
+def test_pipeline_feeds_paced_chunks(tmp_path, monkeypatch):
+    import threading
+    import time as _time
+    import nordlys.server as srv
+
+    monkeypatch.setattr(srv, "LEAD_SEC", 1000.0)  # no pacing sleeps in test
+    st = Station(sr=8000, block=24000, seed=2, spool_dir=str(tmp_path / "sp"),
+                 tts_cmd=None)
+    st.encoder.close()
+    feeds = []
+    st.encoder = type("FakeEnc", (), {"feed": lambda self, b: feeds.append(b.shape[1]),
+                                      "close": lambda self: None})()
+    t = threading.Thread(target=st.run_pipeline, daemon=True)
+    t.start()
+    deadline = _time.time() + 10
+    while len(feeds) < 6 and _time.time() < deadline:
+        _time.sleep(0.05)
+    st.stop.set()
+    t.join(timeout=5)
+    assert len(feeds) >= 6
+    # 3s blocks at 1s chunks: every feed is exactly 1s of audio
+    assert set(feeds[:6]) == {8000}
